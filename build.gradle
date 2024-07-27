@@ -5,9 +5,11 @@ plugins {
 }
 
 sourceCompatibility = 1.11
+
 def baseVersion = '3.9.4'
 def baseGroupId = 'io.github.adempiere'
 def grpcVersion = '1.62.2'
+def protobufVersion = '3.25.3'
 
 repositories {
     mavenLocal()
@@ -28,15 +30,19 @@ dependencies {
         ]
     )
 	api "io.grpc:grpc-netty-shaded:${grpcVersion}"
-	api 'com.google.protobuf:protobuf-java:3.25.3'
-	api 'com.google.protobuf:protobuf-java-util:3.25.3'
+	// https://central.sonatype.com/artifact/com.google.protobuf/protobuf-java
+	implementation "com.google.protobuf:protobuf-java:${protobufVersion}"
+	implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
 	api 'io.jsonwebtoken:jjwt-api:0.11.2'
     api 'io.jsonwebtoken:jjwt-impl:0.11.2'
     api 'io.jsonwebtoken:jjwt-jackson:0.11.2'
 
-    //	ADempiere Core
-    api "${baseGroupId}:base:${baseVersion}"
-   	api "${baseGroupId}:adempiere-jwt-token:1.0.2"
+	//	ADempiere Core
+	api "${baseGroupId}:base:${baseVersion}"
+
+	// ADempiere Projects with additional features
+	// Third part access using JWT (https://central.sonatype.com/artifact/io.github.adempiere/adempiere-jwt-token)
+	api "${baseGroupId}:adempiere-jwt-token:1.0.2"
 }
 
 sourceSets {
@@ -101,6 +107,11 @@ publishing {
                         name = 'Yamel Senih'
                         email = 'ysenih@erpya.com'
                     }
+					developer {
+						id = 'edwinbetanc0urt'
+						name = 'Edwin Betancourt'
+						email = 'EdwinBetanc0urt@outlook.com'
+					}
                 }
                 scm {
                     connection = 'scm:git:git://github.com/adempiere/adempiere-grpc-utils.git'
@@ -119,19 +130,21 @@ task cleanBuildPublishLocal(type: GradleBuild) {
 
 
 signing {
-	def isReleaseVersion = !version.toString().startsWith("local") && !version.toString().endsWith("-SNAPSHOT")
+	def isReleaseVersion = !version.toString().startsWith("local") &&
+		!version.toString().endsWith("SNAPSHOT") &&
+		version.toString() != "ci"
 
 	sign configurations.archives
 
 	setRequired {
 		// signing is required if this is a release version and the artifacts are to be published
 		// do not use hasTask() as this require realization of the tasks that maybe are not necessary
-		(isReleaseVersion || version.toString().equals("build")) && gradle.taskGraph.allTasks.any {
+		isReleaseVersion && gradle.taskGraph.allTasks.any {
 			it.equals(PublishToMavenRepository)
 		}
 	}
 	def signingKey = findProperty("deploySigningKey")
-    def signingPassword = findProperty("deploySigningPassword")
-    useInMemoryPgpKeys(signingKey, signingPassword)
-    sign publishing.publications.mavenJava
+	def signingPassword = findProperty("deploySigningPassword")
+	useInMemoryPgpKeys(signingKey, signingPassword)
+	sign publishing.publications.mavenJava
 }

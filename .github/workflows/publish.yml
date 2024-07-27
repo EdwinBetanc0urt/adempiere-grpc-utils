@@ -1,20 +1,46 @@
 # This is a basic workflow to help you get started with Actions
 # This file was contributed by Carlos Parada, Edwin Betancourt and Yamel Senih from ERP Consultores y Asociados, C.A
 
-name: Publish With gradle to maven central
+name: Publish to Sonatype/GitHub Packages
 
-# Controls when the action will run. 
+# Controls when the action will run.
 on:
   # Triggers the workflow on push or pull request events but only for the develop branch
   release:
-    types: 
+    types:
       - published
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
 
+  # Check secrets to push artifact in maven registry
+  check-sonatype-secrets:
+    name: Check if sonatype registry information was set on secrets
+    runs-on: ubuntu-latest
+    outputs:
+      is_have_secrets: ${{ steps.check_sonatype_secrets_job.outputs.is_have_secrets }}
+    steps:
+      - id: check_sonatype_secrets_job
+        run: |
+          if [[ -n "${{ secrets.DEPLOY_PUBLISH_SONATYPE_URL }}" && \
+                -n "${{ secrets.PGP_SECRET }}" && \
+                -n "${{ secrets.PGP_PASSPHRASE }}" && \
+                -n "${{ secrets.OSSRH_USERNAME }}" && \
+                -n "${{ secrets.OSSRH_TOKEN }}" ]]; \
+          then
+            echo "Secrets to use a sonatype registry are configured in the repo"
+            echo "is_have_secrets=true" >> $GITHUB_OUTPUT
+          else
+            echo "Secrets to use a sonatype registry were not configured in the repo"
+            echo "is_have_secrets=false" >> $GITHUB_OUTPUT
+          fi
+
   publish-sonatype:
     name: Publish Project (Sonatype)
+    needs:
+      - check-sonatype-secrets
+    # Skip step based on secret
+    if: needs.check-sonatype-secrets.outputs.is_have_secrets == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
@@ -40,8 +66,34 @@ jobs:
           ORG_GRADLE_PROJECT_deploySigningPassword: ${{ secrets.PGP_PASSPHRASE }}
           ORG_GRADLE_PROJECT_deployUsername: ${{ secrets.OSSRH_USERNAME }}
           ORG_GRADLE_PROJECT_deployPassword: ${{ secrets.OSSRH_TOKEN }}
+
+
+  # Check secrets to push artifact in maven registry
+  check-github-secrets:
+    name: Check if github registry information was set on secrets
+    runs-on: ubuntu-latest
+    outputs:
+      is_have_secrets: ${{ steps.check_sgithub_secrets_job.outputs.is_have_secrets }}
+    steps:
+      - id: check_github_secrets_job
+        run: |
+          if [[ -n "${{ secrets.DEPLOY_PUBLISH_GITHUB_URL }}" && \
+                -n "${{ secrets.PGP_SECRET }}" && \
+                -n "${{ secrets.PGP_PASSPHRASE }}" ]]; \
+          then
+            echo "Secrets to use a github registry are configured in the repo"
+            echo "is_have_secrets=true" >> $GITHUB_OUTPUT
+          else
+            echo "Secrets to use a github registry were not configured in the repo"
+            echo "is_have_secrets=false" >> $GITHUB_OUTPUT
+          fi
+
   publish-github:
     name: Publish Project (Github)
+    needs:
+      - check-github-secrets
+    # Skip step based on secret
+    if: needs.check-github-secrets.outputs.is_have_secrets == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
@@ -65,5 +117,5 @@ jobs:
           ORG_GRADLE_PROJECT_deployPublishUrl: ${{ secrets.DEPLOY_PUBLISH_GITHUB_URL }}
           ORG_GRADLE_PROJECT_deploySigningKey: ${{ secrets.PGP_SECRET }}
           ORG_GRADLE_PROJECT_deploySigningPassword: ${{ secrets.PGP_PASSPHRASE }}
-          ORG_GRADLE_PROJECT_deployUsername: "${{ github.actor }}"
-          ORG_GRADLE_PROJECT_deployPassword: "${{ secrets.DEPLOY_TOKEN }}"
+          ORG_GRADLE_PROJECT_deployUsername: ${{ github.actor }}
+          ORG_GRADLE_PROJECT_deployPassword: ${{ secrets.GITHUB_TOKEN }}
