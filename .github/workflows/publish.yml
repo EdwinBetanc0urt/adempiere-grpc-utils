@@ -77,7 +77,9 @@ jobs:
     steps:
       - id: check_github_secrets_job
         run: |
-          if [[ -n "${{ secrets.DEPLOY_PUBLISH_GITHUB_URL }}" ]]; \
+          if [[ "${{ secrets.DEPLOY_PUBLISH_GITHUB_URL }}" != "" && \
+                "${{ secrets.PGP_SECRET }}" != "" && \
+                "${{ secrets.PGP_PASSPHRASE }}" != "" ]]; \
           then
             echo "Secrets to use a github registry are configured in the repo"
             echo "is_have_secrets=true" >> $GITHUB_OUTPUT
